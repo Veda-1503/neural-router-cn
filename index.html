@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Router — Secure Packet Delivery</title>
+    <meta name="description" content="AI-powered secure packet routing. DQN neural agent navigates real-time network topology, avoiding malicious nodes to guarantee safe delivery.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+
+<!-- ── Topbar ───────────────────────────────────────────────────── -->
+<header class="topbar">
+    <div class="topbar-left">
+        <a href="/" class="brand">
+            <div class="brand-logo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <span class="brand-name">Neural Router</span>
+        </a>
+        <div class="topbar-divider"></div>
+        <nav class="topbar-nav">
+            <a href="/" class="nav-link active">Overview</a>
+            <a href="/admin" class="nav-link">Admin</a>
+        </nav>
+    </div>
+    <div class="topbar-right">
+        <div class="status-indicator" id="system-status">
+            <span class="status-dot loading" id="status-dot"></span>
+            <span id="status-text">Connecting</span>
+        </div>
+    </div>
+</header>
+
+<!-- ── Main Layout ──────────────────────────────────────────────── -->
+<div class="layout">
+
+    <!-- ── Sidebar ──────────────────────────────────────────────── -->
+    <aside class="sidebar">
+
+        <!-- Deploy -->
+        <div class="sb-section">
+            <div class="sb-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Packet Dispatch
+            </div>
+            <p class="sb-desc">The DQN agent generates a live network topology and routes your packet through it, avoiding all compromised nodes autonomously.</p>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <button id="btn-deploy" class="btn btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+                    Deploy Secure Packet
+                </button>
+                <button id="btn-live" class="btn btn-default">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                    Stream Live Route
+                </button>
+            </div>
+            <div class="slider-row" style="margin-top:12px;">
+                <label for="speed-slider">Hop delay</label>
+                <input type="range" id="speed-slider" min="200" max="2000" value="750" step="50">
+                <span class="slider-val" id="speed-label">750ms</span>
+            </div>
+        </div>
+
+        <!-- Route Trace -->
+        <div class="sb-section" id="route-panel" style="display:none;">
+            <div class="sb-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Route Trace
+            </div>
+            <div id="path-flow" class="path-flow"></div>
+            <div class="export-row" style="margin-top:10px;">
+                <button class="export-btn" id="btn-export-json" disabled>Export JSON</button>
+                <button class="export-btn" id="btn-export-csv" disabled>Export CSV</button>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="sb-section">
+            <div class="sb-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Legend
+            </div>
+            <div class="legend">
+                <div class="legend-row"><span class="legend-dot source"></span>Origin node</div>
+                <div class="legend-row"><span class="legend-dot dest"></span>Destination node</div>
+                <div class="legend-row"><span class="legend-dot safe"></span>Secure node</div>
+                <div class="legend-row"><span class="legend-dot threat"></span>Compromised node</div>
+                <div class="legend-row"><span class="legend-line"></span>Routed path</div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ── Main graph view ──────────────────────────────────────── -->
+    <main class="main-view">
+        <div class="view-header">
+            <span class="view-title">Network Traversal Map</span>
+            <div class="view-right">
+                <span class="live-badge" id="live-badge">
+                    <span class="live-dot"></span>Live
+                </span>
+                <span class="hop-count" id="val-hops" style="display:none;"></span>
+                <span class="badge" id="val-reason">Idle</span>
+            </div>
+        </div>
+
+        <div id="mynetwork">
+            <div class="empty-state" id="empty-state">
+                <div class="empty-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                    </svg>
+                </div>
+                <div class="empty-title">No route data</div>
+                <div class="empty-sub">Click "Deploy Secure Packet" to begin</div>
+            </div>
+        </div>
+
+        <div class="view-footer">
+            <div class="stat-row" id="topo-stats" style="display:none;">
+                <div class="stat-item">Nodes <strong id="stat-nodes">—</strong></div>
+                <div class="stat-sep"></div>
+                <div class="stat-item">Links <strong id="stat-edges">—</strong></div>
+                <div class="stat-sep"></div>
+                <div class="stat-item threat">Threats <strong id="stat-mal">—</strong></div>
+            </div>
+            <div style="margin-left:auto;">
+                <button id="btn-replay" class="btn btn-ghost btn-sm" disabled>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Replay
+                </button>
+            </div>
+        </div>
+    </main>
+
+</div>
+
+<div id="toast-root"></div>
+<script src="user.js"></script>
+</body>
+</html>

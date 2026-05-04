@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Router — Admin</title>
+    <meta name="description" content="Admin dashboard. Configure topology, run batch or live simulations, retrain the DQN agent, export results.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2'><circle cx='12' cy='12' r='3'/><path d='M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14'/></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+
+<!-- ── Topbar ───────────────────────────────────────────────────── -->
+<header class="topbar">
+    <div class="topbar-left">
+        <a href="/" class="brand">
+            <div class="brand-logo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <span class="brand-name">Neural Router</span>
+        </a>
+        <div class="topbar-divider"></div>
+        <nav class="topbar-nav">
+            <a href="/" class="nav-link">Overview</a>
+            <a href="/admin" class="nav-link active">Admin</a>
+        </nav>
+    </div>
+    <div class="topbar-right">
+        <span class="device-badge" id="device-badge" style="display:none;" id="model-device"></span>
+        <div class="status-indicator" id="system-status">
+            <span class="status-dot loading" id="status-dot"></span>
+            <span id="status-text">Connecting</span>
+        </div>
+    </div>
+</header>
+
+<!-- ── Main Layout ──────────────────────────────────────────────── -->
+<div class="layout">
+
+    <!-- ── Sidebar ──────────────────────────────────────────────── -->
+    <aside class="sidebar">
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="simulate">Simulate</button>
+            <button class="tab-btn" data-tab="live">Live</button>
+            <button class="tab-btn" data-tab="retrain">Retrain</button>
+            <button class="tab-btn" data-tab="export">Export</button>
+        </div>
+
+        <!-- Simulate Tab -->
+        <div class="tab-content active" id="tab-simulate">
+            <form id="sim-form" style="display:contents;">
+                <div class="field">
+                    <label for="node-count">Node capacity</label>
+                    <input type="number" id="node-count" min="5" max="300" value="25">
+                </div>
+                <div class="field">
+                    <label for="mal-ratio">Malicious ratio</label>
+                    <input type="number" id="mal-ratio" min="0" max="0.9" step="0.05" value="0.2">
+                </div>
+                <div class="field">
+                    <label for="test-episodes">Test episodes</label>
+                    <input type="number" id="test-episodes" min="1" max="500" value="100">
+                </div>
+                <div class="field">
+                    <label for="topology-select">Graph topology</label>
+                    <div class="select-wrap">
+                        <select id="topology-select">
+                            <option value="">Auto (random mix)</option>
+                            <option value="barabasi_albert">Barabasi-Albert — Scale-Free</option>
+                            <option value="erdos_renyi">Erdos-Renyi — Random</option>
+                            <option value="watts_strogatz">Watts-Strogatz — Small-World</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="checkbox-field">
+                    <input type="checkbox" id="multi-path">
+                    <span>Show multi-path overlay (3 routes)</span>
+                </label>
+                <div class="slider-row">
+                    <label for="speed-slider">Animation</label>
+                    <input type="range" id="speed-slider" min="200" max="2000" value="750" step="50">
+                    <span class="slider-val" id="speed-label">750ms</span>
+                </div>
+                <button type="submit" id="btn-generate" class="btn btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Run Simulation
+                </button>
+            </form>
+        </div>
+
+        <!-- Live Tab -->
+        <div class="tab-content" id="tab-live">
+            <p class="sb-desc" style="margin-bottom:0;">Stream each routing hop in real-time via SSE. Topology is built fresh for each session.</p>
+            <div class="slider-row">
+                <label for="live-speed-slider">Hop delay</label>
+                <input type="range" id="live-speed-slider" min="100" max="2000" value="750" step="50">
+                <span class="slider-val" id="live-speed-label">750ms</span>
+            </div>
+            <button id="btn-live" class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                Start Live Route
+            </button>
+        </div>
+
+        <!-- Retrain Tab -->
+        <div class="tab-content" id="tab-retrain">
+            <p class="sb-desc" style="margin-bottom:0;">Run additional training episodes on a freshly generated topology set. Weights are saved automatically to <code style="font-family:var(--mono);font-size:11px;color:var(--text-2);">router_model.pth</code>.</p>
+            <div class="field">
+                <label for="retrain-episodes">Additional episodes</label>
+                <input type="number" id="retrain-episodes" min="100" max="5000" step="100" value="500">
+            </div>
+            <button id="btn-retrain" class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                Start Retraining
+            </button>
+            <div id="retrain-status" style="display:none;">
+                <div class="retrain-info">
+                    <span id="retrain-msg">Initializing…</span>
+                    <code id="retrain-pct">0%</code>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="retrain-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div class="tab-content" id="tab-export">
+            <p class="sb-desc" style="margin-bottom:0;">Download the last simulation result. Run a simulation first to enable exports.</p>
+            <div class="export-row">
+                <button class="export-btn" id="btn-export-json" disabled style="height:36px;">Export JSON</button>
+                <button class="export-btn" id="btn-export-csv"  disabled style="height:36px;">Export CSV</button>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="sb-section">
+            <div class="sb-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Simulation Results
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Routing Accuracy</div>
+                    <div class="metric-value good" id="val-accuracy">—</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Crash Rate</div>
+                    <div class="metric-value bad" id="val-crash">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="sb-section">
+            <div class="sb-label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Legend
+            </div>
+            <div class="legend">
+                <div class="legend-row"><span class="legend-dot source"></span>Origin node</div>
+                <div class="legend-row"><span class="legend-dot dest"></span>Destination node</div>
+                <div class="legend-row"><span class="legend-dot safe"></span>Secure node</div>
+                <div class="legend-row"><span class="legend-dot threat"></span>Compromised node</div>
+                <div class="legend-row"><span class="legend-line"></span>Routed path</div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ── Main graph view ──────────────────────────────────────── -->
+    <main class="main-view">
+        <div class="view-header">
+            <span class="view-title">Topology Simulation</span>
+            <div class="view-right">
+                <span class="live-badge" id="live-badge"><span class="live-dot"></span>Live</span>
+                <div class="path-legend" id="path-legend" style="display:none;"></div>
+                <span class="hop-count" id="val-hops" style="display:none;"></span>
+                <span class="badge" id="val-reason">Idle</span>
+            </div>
+        </div>
+
+        <div id="mynetwork">
+            <div class="empty-state" id="empty-state">
+                <div class="empty-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+                        <path d="M6 9v6"/><path d="M18 9a9 9 0 00-9 9"/>
+                    </svg>
+                </div>
+                <div class="empty-title">No simulation running</div>
+                <div class="empty-sub">Configure parameters in the Simulate tab and click Run</div>
+            </div>
+        </div>
+
+        <div class="view-footer">
+            <div class="stat-row" id="topo-stats" style="display:none;">
+                <div class="stat-item">Nodes <strong id="stat-nodes">—</strong></div>
+                <div class="stat-sep"></div>
+                <div class="stat-item">Links <strong id="stat-edges">—</strong></div>
+                <div class="stat-sep"></div>
+                <div class="stat-item threat">Threats <strong id="stat-mal">—</strong></div>
+            </div>
+            <div style="margin-left:auto;">
+                <button id="btn-replay" class="btn btn-ghost btn-sm" disabled>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Replay
+                </button>
+            </div>
+        </div>
+    </main>
+
+</div>
+
+<div id="toast-root"></div>
+<script src="admin.js"></script>
+</body>
+</html>
